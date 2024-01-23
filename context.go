@@ -1,6 +1,10 @@
 package acr122u
 
-import "github.com/ebfe/scard"
+import (
+	"strings"
+
+	"github.com/ebfe/scard"
+)
 
 var scardEstablishContext = scard.EstablishContext
 
@@ -39,6 +43,50 @@ func WithProtocol(p Protocol) Option {
 	}
 }
 
+func containsIgnoreCase(s string, substr string) bool {
+	s = strings.ToLower(s)
+	substr = strings.ToLower(substr)
+
+	return strings.Contains(s, substr)
+}
+
+func newContext(sctx scardContext, options ...Option) (*Context, error) {
+	if _, err := sctx.IsValid(); err != nil {
+		return nil, err
+	}
+
+	_readers, err := sctx.ListReaders()
+	if err != nil {
+		return nil, err
+	}
+
+	readers := []string{}
+
+	for _, reader := range _readers {
+		if containsIgnoreCase(reader, "ACR122U") {
+			readers = append(readers, reader)
+		}
+	}
+
+	if len(readers) == 0 {
+		return nil, scard.ErrNoReadersAvailable
+	}
+
+	ctx := &Context{
+		context:   sctx,
+		readers:   readers,
+		shareMode: ShareShared,
+		protocol:  ProtocolAny,
+	}
+
+	for _, option := range options {
+		option(ctx)
+	}
+
+	return ctx, nil
+}
+
+/*
 func newContext(sctx scardContext, options ...Option) (*Context, error) {
 	if _, err := sctx.IsValid(); err != nil {
 		return nil, err
@@ -66,6 +114,7 @@ func newContext(sctx scardContext, options ...Option) (*Context, error) {
 
 	return ctx, nil
 }
+*/
 
 // Release should be called when the context is not needed anymore
 func (ctx *Context) Release() error {
